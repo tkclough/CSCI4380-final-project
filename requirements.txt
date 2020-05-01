@@ -1,2 +1,2 @@
 wget
-psycopg2
+tqdm

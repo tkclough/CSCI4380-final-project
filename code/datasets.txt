@@ -1,1 +1,1 @@
-https://data.ny.gov/api/views/3cij-nwhw/rows.csv?accessType=DOWNLOAD&sorting=true
+https://www.ncei.noaa.gov/data/coop-hourly-precipitation/v2/archive/HPD_v02r02_POR_s19400101_e20200422_c20200429.tar.gz
