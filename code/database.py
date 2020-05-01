@@ -1,5 +1,6 @@
 import psycopg2
 
+
 class DBMSFinalProject:
     def __init__(self, connection_string):
         self.conn = psycopg2.connect(connection_string)
