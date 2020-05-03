@@ -3,6 +3,12 @@ import tarfile
 import io
 import re
 import tqdm
+import xlrd
+from datetime import datetime
+import gzip
+import csv
+import math
+import bisect
 connection_string = "host='localhost' dbname='dbms_final_project' user='dbms_project_user' password='dbms_password'"
 
 # TODO add your code here (or in other files, at your discretion) to load the data
@@ -12,12 +18,52 @@ def main():
     # TODO invoke your code to load the data into the database
     print("Loading data")
 
-    # write to a new csv that only includes rows from 2008
-    write_relevant_rows('datasets/HPD_v02r02_POR_s19400101_e20200422_c20200429.tar.gz', 'datasets/2008-all.csv')
+    with psycopg2.connect(connection_string) as conn:
+        # write to a new csv that only includes rows from 2008
+        print('Loading measurement data')
+        load_measurements(conn, 'datasets/HPD_v02r02_POR_s19400101_e20200422_c20200429.tar.gz')
+
+        # read incident data
+        print('Loading 2008 fire incident data')
+        load_incidents(conn, 'datasets/2008incidentaddress.xlsx')
+
+        # compute closest stations
+        print('Computing closest stations')
+        compute_closest_stations(conn)
 
 
-def write_relevant_rows(tarfilename, outfilename, year=2008):
-    pat = r'(\d{4})-\d{2}-\d{2}'
+def load_incidents(conn, incident_filename):
+    print('Opening excel workbook, give me a minute...')
+    with conn.cursor() as cur, \
+         xlrd.open_workbook(incident_filename) as f:
+        sheet = f.sheets()[0] # for some reason get_sheet(0) fails
+        rows = sheet.get_rows()
+
+        # skip header
+        next(rows)
+        for row in tqdm.tqdm(rows, total=sheet.nrows):
+            state = row[0].value
+            city = row[12].value
+            zipcode = row[14].value
+
+            if state == '':
+                state = None
+            if city == '':
+                city = None
+            if zipcode == '':
+                zipcode = None
+
+            # dates have a weird format '%m%d%Y' but month is not zero padded so strptime without some help
+            datestr = row[2].value
+            date = datetime.strptime('%08d' % (datestr,), '%m%d%Y')
+            date = datetime.strftime(date, '%Y-%m-%d')
+
+            cur.execute('INSERT INTO incident VALUES (%s, %s, %s, %s);', (city, state, zipcode, date))
+
+
+def load_measurements(conn, tarfilename, year=2008):
+    pat = r'(\d{4})-(\d{2})-(\d{2})'
+
     headers = [
         'StnID', 'Lat', 'Lon', 'Elev', 'Year-Month-Day', 'Element', 'HR00Val', 'HR00MF', 'HR00QF', 'HR00S1', 'HR00S2',
         'HR01Val', 'HR01MF', 'HR01QF', 'HR01S1', 'HR01S2', 'HR02Val', 'HR02MF', 'HR02QF', 'HR02S1', 'HR02S2', 'HR03Val',
@@ -33,24 +79,70 @@ def write_relevant_rows(tarfilename, outfilename, year=2008):
         'HR22S2', 'HR23Val', 'HR23MF', 'HR23QF', 'HR23S1', 'HR23S2', 'DlySum', 'DlySumMF', 'DlySumQF', 'DlySumS1',
         'DlySumS2'
     ]
+    nameToCol = {name: i for i, name in enumerate(headers)}
+
     # open the output file for writing and the .tar.gz archive for reading
-    with open(outfilename, 'w') as f, tarfile.open(tarfilename) as t:
-        f.truncate(0)
-        # write header
-        f.write(','.join(headers) + '\n')
+    print('Opening tarfile, give me a minute...')
+    with conn.cursor() as cur, \
+         tarfile.open(tarfilename) as t:
         # for each csv file in the archive
         for member in tqdm.tqdm(t.getmembers()):
             # open the csv file within the archive (binary), and wrap in line based layer
+            found = False
             with t.extractfile(member) as f2, io.TextIOWrapper(f2, encoding='utf-8', newline='') as csvfile:
+                next(csvfile)
                 # for each line in the file
                 for line in csvfile:
                     # the date is the 4th column
-                    date = line.split(',')[4].strip()
+                    parts = line.split(',')
+                    date = parts[nameToCol['Year-Month-Day']].strip()
                     match = re.match(pat, date)
 
                     # determine if the year is correct, and if so, write
                     if match and int(match.group(1)) == year:
-                        f.write(line)
+                        found = True
+                        for hr in range(24):
+                            colname = 'HR%02dVal' % (hr,)
+                            val = parts[nameToCol[colname]]
+                            dt = '%s %02d:00:00' % (date, hr)
+                            cur.execute("INSERT INTO measurement VALUES (%s, %s, %s)",
+                                        (parts[nameToCol['StnID']], dt, val))
+                    elif found:
+                        break
+                conn.commit()
+
+
+def compute_closest_stations(conn):
+    with conn.cursor() as cur:
+        stations = list()
+        with gzip.open('datasets/HPD_v02r02_stationinv_c20200429.csv.gz', 'rt') as station_file:
+            csv_reader = csv.reader(station_file, delimiter=',')
+            next(csv_reader)
+            for row in csv_reader:
+                stations.append((str(row[0]), float(row[1]), float(row[2])))
+        stations.sort(key=lambda x: x[1])
+        with open('datasets/raw', 'r') as zipcode_file:
+            csv_reader = csv.reader(zipcode_file, delimiter=',')
+            next(csv_reader)
+            for row in tqdm.tqdm(csv_reader):
+                zipcode = str(row[0])
+                lat = float(row[1])
+                lng = float(row[2])
+                closest = ""
+                dist = -1
+                for station in stations:
+                    st_name = station[0]
+                    st_lat = station[1]
+                    st_lng = station[2]
+                    if dist >= 0 and (st_lat - lat) > dist:
+                        break
+                    st_dist = math.sqrt((st_lat-lat)**2 + (st_lng-lng)**2)
+                    if st_dist < dist or dist == -1:
+                        closest = st_name
+                        dist = st_dist
+
+                cur.execute("INSERT INTO closest_station VALUES (%s, %s);", (zipcode, closest))
+            conn.commit()
 
 
 if __name__ == "__main__":
