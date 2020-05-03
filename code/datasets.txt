@@ -1,1 +1,5 @@
 https://www.ncei.noaa.gov/data/coop-hourly-precipitation/v2/archive/HPD_v02r02_POR_s19400101_e20200422_c20200429.tar.gz
+https://www.ncei.noaa.gov/data/coop-hourly-precipitation/v2/archive/HPD_v02r02_stationinv_c20200429.csv.gz
+https://www.fema.gov/media-library-data/17aab6b7bd378ae058ea1bc9efc566f4/basicincident.xlsx
+https://www.fema.gov/media-library-data/4ff40ba35fe04c31072bf94ff99458ba/2008incidentaddress.xlsx
+https://gist.githubusercontent.com/erichurst/7882666/raw
