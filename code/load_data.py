@@ -1,4 +1,5 @@
 import psycopg2
+import psycopg2.extras
 import tarfile
 import io
 import re
@@ -7,8 +8,8 @@ import xlrd
 from datetime import datetime
 import gzip
 import csv
+import itertools
 import math
-import bisect
 connection_string = "host='localhost' dbname='dbms_final_project' user='dbms_project_user' password='dbms_password'"
 
 # TODO add your code here (or in other files, at your discretion) to load the data
@@ -32,10 +33,20 @@ def main():
         compute_closest_stations(conn)
 
 
+def batch_insert(conn, stmt, records, batch_size, page_size):
+    with conn.cursor() as cur:
+        record_iter = iter(records)
+        for i in tqdm.tqdm(range(0, len(records), batch_size)):
+            batch = itertools.islice(record_iter, min(batch_size, len(records) - i))
+            psycopg2.extras.execute_values(cur, stmt, batch, page_size=page_size)
+
+    conn.commit()
+
+
 def load_incidents(conn, incident_filename):
     print('Opening excel workbook, give me a minute...')
-    with conn.cursor() as cur, \
-         xlrd.open_workbook(incident_filename) as f:
+    records = []
+    with xlrd.open_workbook(incident_filename) as f:
         sheet = f.sheets()[0] # for some reason get_sheet(0) fails
         rows = sheet.get_rows()
 
@@ -58,7 +69,10 @@ def load_incidents(conn, incident_filename):
             date = datetime.strptime('%08d' % (datestr,), '%m%d%Y')
             date = datetime.strftime(date, '%Y-%m-%d')
 
-            cur.execute('INSERT INTO incident VALUES (%s, %s, %s, %s);', (city, state, zipcode, date))
+            records.append((city, state, zipcode, date))
+
+    print('Inserting records...')
+    batch_insert(conn, "INSERT INTO incident VALUES %s;", records, 10000, 100)
 
 
 def load_measurements(conn, tarfilename, year=2008):
@@ -83,8 +97,8 @@ def load_measurements(conn, tarfilename, year=2008):
 
     # open the output file for writing and the .tar.gz archive for reading
     print('Opening tarfile, give me a minute...')
-    with conn.cursor() as cur, \
-         tarfile.open(tarfilename) as t:
+    records = []
+    with tarfile.open(tarfilename) as t:
         # for each csv file in the archive
         for member in tqdm.tqdm(t.getmembers()):
             # open the csv file within the archive (binary), and wrap in line based layer
@@ -105,44 +119,48 @@ def load_measurements(conn, tarfilename, year=2008):
                             colname = 'HR%02dVal' % (hr,)
                             val = parts[nameToCol[colname]]
                             dt = '%s %02d:00:00' % (date, hr)
-                            cur.execute("INSERT INTO measurement VALUES (%s, %s, %s)",
-                                        (parts[nameToCol['StnID']], dt, val))
+                            records.append((parts[nameToCol['StnID']], dt, val))
                     elif found:
+                        # once we're past the 2008 records, we won't find any more
                         break
-                conn.commit()
+
+    print('Inserting records...')
+    batch_insert(conn, "INSERT INTO measurement VALUES %s;", records, 100000, 1000)
 
 
 def compute_closest_stations(conn):
-    with conn.cursor() as cur:
-        stations = list()
-        with gzip.open('datasets/HPD_v02r02_stationinv_c20200429.csv.gz', 'rt') as station_file:
-            csv_reader = csv.reader(station_file, delimiter=',')
-            next(csv_reader)
-            for row in csv_reader:
-                stations.append((str(row[0]), float(row[1]), float(row[2])))
-        stations.sort(key=lambda x: x[1])
-        with open('datasets/raw', 'r') as zipcode_file:
-            csv_reader = csv.reader(zipcode_file, delimiter=',')
-            next(csv_reader)
-            for row in tqdm.tqdm(csv_reader):
-                zipcode = str(row[0])
-                lat = float(row[1])
-                lng = float(row[2])
-                closest = ""
-                dist = -1
-                for station in stations:
-                    st_name = station[0]
-                    st_lat = station[1]
-                    st_lng = station[2]
-                    if dist >= 0 and (st_lat - lat) > dist:
-                        break
-                    st_dist = math.sqrt((st_lat-lat)**2 + (st_lng-lng)**2)
-                    if st_dist < dist or dist == -1:
-                        closest = st_name
-                        dist = st_dist
+    records = []
 
-                cur.execute("INSERT INTO closest_station VALUES (%s, %s);", (zipcode, closest))
-            conn.commit()
+    stations = list()
+    with gzip.open('datasets/HPD_v02r02_stationinv_c20200429.csv.gz', 'rt') as station_file:
+        csv_reader = csv.reader(station_file, delimiter=',')
+        next(csv_reader)
+        for row in csv_reader:
+            stations.append((str(row[0]), float(row[1]), float(row[2])))
+    stations.sort(key=lambda x: x[1])
+    with open('datasets/raw', 'r') as zipcode_file:
+        csv_reader = csv.reader(zipcode_file, delimiter=',')
+        next(csv_reader)
+        for row in tqdm.tqdm(csv_reader):
+            zipcode = str(row[0])
+            lat = float(row[1])
+            lng = float(row[2])
+            closest = ""
+            dist = -1
+            for station in stations:
+                st_name = station[0]
+                st_lat = station[1]
+                st_lng = station[2]
+                if dist >= 0 and (st_lat - lat) > dist:
+                    break
+                st_dist = math.sqrt((st_lat-lat)**2 + (st_lng-lng)**2)
+                if st_dist < dist or dist == -1:
+                    closest = st_name
+                    dist = st_dist
+            records.append((zipcode, closest))
+
+    print('Inserting records...')
+    batch_insert(conn, "INSERT INTO closest_station VALUES %s;", records, 1000, 100)
 
 
 if __name__ == "__main__":
