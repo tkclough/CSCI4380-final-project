@@ -19,17 +19,17 @@ def main():
     print("Loading data")
 
     with psycopg2.connect(connection_string) as conn:
-        # write to a new csv that only includes rows from 2008
-        print('Loading measurement data')
-        load_measurements(conn, 'datasets/HPD_v02r02_POR_s19400101_e20200422_c20200429.tar.gz')
-
-        # read incident data
-        print('Loading 2008 fire incident data')
-        load_incident_address(conn, 'datasets/2008incidentaddress.xlsx')
-
-        # compute closest stations
-        print('Computing closest stations')
-        compute_closest_stations(conn)
+        # # write to a new csv that only includes rows from 2008
+        # print('Loading measurement data')
+        # load_measurements(conn, 'datasets/HPD_v02r02_POR_s19400101_e20200422_c20200429.tar.gz')
+        #
+        # # read incident data
+        # print('Loading 2008 fire incident data')
+        # load_incident_address(conn, 'datasets/2008incidentaddress.xlsx')
+        #
+        # # compute closest stations
+        # print('Computing closest stations')
+        # compute_closest_stations(conn)
 
         print('Loading basic incident data')
         load_basic_incident(conn, 'datasets/basicincident.xlsx')
@@ -70,7 +70,17 @@ def load_basic_incident(conn, filename, batch_size=10000):
                 batch = itertools.islice(rows, batch_size)
                 records = []
                 for row in batch:
-                    records.append([(row[i].value if row[i].value != 'None' else None) for i in indices])
+                    record = [(row[i].value if row[i].value != 'None' else None) for i in indices]
+
+                    d = record[0]
+                    if d:
+                        d = int(d)
+                        year = d % 10000
+                        month = d // 1000000
+                        day = (d // 10000) % 100
+                        record[0] = '{:4d}-{:02d}-{:02d}'.format(year, month, day)
+
+                    records.append(record)
                 psycopg2.extras.execute_values(cur, "INSERT INTO basic_incident VALUES %s;", records, page_size=100)
                 conn.commit()
     finally:
@@ -108,7 +118,7 @@ def load_measurements(conn, tarfilename, year=2008):
     headers = [
         'StnID', 'Lat', 'Lon', 'Elev', 'Year-Month-Day', 'Element', 'HR00Val', 'HR00MF', 'HR00QF', 'HR00S1', 'HR00S2',
         'HR01Val', 'HR01MF', 'HR01QF', 'HR01S1', 'HR01S2', 'HR02Val', 'HR02MF', 'HR02QF', 'HR02S1', 'HR02S2', 'HR03Val',
-        'HR03MF'    'HR03QF', 'HR03S1', 'HR03S2', 'HR04Val', 'HR04MF', 'HR04QF', 'HR04S1', 'HR04S2', 'HR05Val',
+        'HR03MF', 'HR03QF', 'HR03S1', 'HR03S2', 'HR04Val', 'HR04MF', 'HR04QF', 'HR04S1', 'HR04S2', 'HR05Val',
         'HR05MF', 'HR05QF', 'HR05S1', 'HR05S2', 'HR06Val', 'HR06MF', 'HR06QF', 'HR06S1', 'HR06S2', 'HR07Val', 'HR07MF',
         'HR07QF', 'HR07S1', 'HR07S2', 'HR08Val', 'HR08MF', 'HR08QF', 'HR08S1', 'HR08S2', 'HR09Val', 'HR09MF', 'HR09QF',
         'HR09S1', 'HR09S2', 'HR10Val', 'HR10MF', 'HR10QF', 'HR10S1', 'HR10S2', 'HR11Val', 'HR11MF', 'HR11QF', 'HR11S1',
@@ -125,6 +135,7 @@ def load_measurements(conn, tarfilename, year=2008):
     # open the output file for writing and the .tar.gz archive for reading
     print('Opening tarfile, give me a minute...')
     records = []
+    skipped = []
     with tarfile.open(tarfilename) as t:
         # for each csv file in the archive
         for member in tqdm.tqdm(t.getmembers()):
@@ -133,9 +144,11 @@ def load_measurements(conn, tarfilename, year=2008):
             with t.extractfile(member) as f2, io.TextIOWrapper(f2, encoding='utf-8', newline='') as csvfile:
                 next(csvfile)
                 # for each line in the file
-                for line in csvfile:
-                    # the date is the 4th column
+                for i, line in enumerate(csvfile):
                     parts = line.split(',')
+                    if len(parts) != len(headers):
+                        skipped.append((i, member.name))
+                    # the date is the 4th column
                     date = parts[nameToCol['Year-Month-Day']].strip()
                     match = re.match(pat, date)
 
@@ -150,6 +163,9 @@ def load_measurements(conn, tarfilename, year=2008):
                     elif found:
                         # once we're past the 2008 records, we won't find any more
                         break
+
+    with conn.cursor() as cur:
+        psycopg2.extras.execute_values(cur, "INSERT INTO measurement_skipped_rows VALUES %s;", skipped)
 
     print('Inserting records...')
     batch_insert(conn, "INSERT INTO measurement VALUES %s;", records, 100000, 1000)

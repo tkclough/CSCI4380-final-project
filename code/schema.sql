@@ -11,8 +11,13 @@ DROP TABLE IF EXISTS basic_incident;
 CREATE TABLE measurement (
     stnId CHAR(12),
     datetime TIMESTAMP,
-    value VARCHAR(8),
+    value INTEGER,
     PRIMARY KEY (stnId, datetime)
+);
+
+CREATE TABLE measurement_skipped_rows (
+    lineno INTEGER,
+    filename VARCHAR(128)
 );
 
 CREATE TABLE incident_address (
@@ -37,7 +42,7 @@ CREATE TABLE incident_address (
 CREATE TABLE basic_incident (
 --    STATE CHAR(2),
 --    FDID CHAR(5),
-    INC_DATE INTEGER,
+    INC_DATE Date,
     INC_NO VARCHAR(16),
 --    EXP_NO INTEGER,
 --    VERSION NUMERIC(5, 3),
@@ -83,4 +88,4 @@ CREATE TABLE closest_station (
     stnId CHAR(12)
 );
 
-GRANT ALL PRIVILEGES ON TABLE measurement, incident_address, closest_station, basic_incident TO dbms_project_user;
+GRANT ALL PRIVILEGES ON TABLE measurement, measurement_skipped_rows, incident_address, closest_station, basic_incident TO dbms_project_user;
