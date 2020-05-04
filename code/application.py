@@ -13,6 +13,7 @@ totalPrecipitationByState <state>
 totalIncidentsByCity <city>"""
     print(msg)
 
+
 def bye():
     print('bye.')
     sys.exit(0)

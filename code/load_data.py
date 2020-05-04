@@ -5,18 +5,17 @@ import io
 import re
 import tqdm
 import xlrd
-from datetime import datetime
+import openpyxl
 import gzip
 import csv
 import itertools
 import math
+import time
 connection_string = "host='localhost' dbname='dbms_final_project' user='dbms_project_user' password='dbms_password'"
-
-# TODO add your code here (or in other files, at your discretion) to load the data
 
 
 def main():
-    # TODO invoke your code to load the data into the database
+    start_time = time.time()
     print("Loading data")
 
     with psycopg2.connect(connection_string) as conn:
@@ -26,11 +25,16 @@ def main():
 
         # read incident data
         print('Loading 2008 fire incident data')
-        load_incidents(conn, 'datasets/2008incidentaddress.xlsx')
+        load_incident_address(conn, 'datasets/2008incidentaddress.xlsx')
 
         # compute closest stations
         print('Computing closest stations')
         compute_closest_stations(conn)
+
+        print('Loading basic incident data')
+        load_basic_incident(conn, 'datasets/basicincident.xlsx')
+
+    print('Done in {:6.2f}s'.format(time.time() - start_time))
 
 
 def batch_insert(conn, stmt, records, batch_size, page_size):
@@ -43,36 +47,59 @@ def batch_insert(conn, stmt, records, batch_size, page_size):
     conn.commit()
 
 
-def load_incidents(conn, incident_filename):
+def load_basic_incident(conn, filename, batch_size=10000):
+    header = [
+        'STATE', 'FDID', 'INC_DATE', 'INC_NO', 'EXP_NO', 'VERSION', 'DEPT_STA', 'INC_TYPE', 'ADD_WILD', 'AID', 'ALARM',
+        'ARRIVAL', 'INC_CONT', 'LU_CLEAR', 'SHIFT', 'ALARMS', 'DISTRICT', 'ACT_TAK1', 'ACT_TAK2', 'ACT_TAK3', 'APP_MOD',
+        'SUP_APP', 'EMS_APP', 'OTH_APP', 'SUP_PER', 'EMS_PER', 'OTH_PER', 'RESOU_AID', 'PROP_LOSS', 'CONT_LOSS',
+        'PROP_VAL', 'CONT_VAL', 'FF_DEATH', 'OTH_DEATH', 'FF_INJ', 'OTH_INJ', 'DET_ALERT', 'HAZ_REL', 'MIXED_USE',
+        'PROP_USE', 'CENSUS'
+    ]
+    nameToCol = {name: i for i, name in enumerate(header)}
+    indices = [nameToCol[name] for name in ('INC_DATE', 'INC_NO', 'PROP_LOSS')]
+
+    print('Opening excel workbook, give me a minute...')
+    # for some reason doesn't define __enter__ so can't use context manager
+    wb = openpyxl.load_workbook(filename=filename, read_only=True)
+    try:
+        with conn.cursor() as cur:
+            ws = wb['basicincident']
+            rows = iter(ws.rows)
+            next(rows)
+            for _ in tqdm.tqdm(range(0, ws.max_row - 1, batch_size), total=ws.max_row // batch_size):
+                batch = itertools.islice(rows, batch_size)
+                records = []
+                for row in batch:
+                    records.append([(row[i].value if row[i].value != 'None' else None) for i in indices])
+                psycopg2.extras.execute_values(cur, "INSERT INTO basic_incident VALUES %s;", records, page_size=100)
+                conn.commit()
+    finally:
+        wb.close()
+
+
+def load_incident_address(conn, filename):
+    header = [
+        'STATE', 'FDID', 'INC_DATE', 'INC_NO', 'EXP_NO', 'LOC_TYPE', 'NUM_MILE', 'STREET_PRE', 'STREETNAME',
+        'STREETTYPE', 'STREETSUF', 'APT_NO', 'CITY', 'STATE_ID', 'ZIP5', 'ZIP4', 'X_STREET'
+    ]
+    nameToCol = {name: i for (i, name) in enumerate(header)}
+
     print('Opening excel workbook, give me a minute...')
     records = []
-    with xlrd.open_workbook(incident_filename) as f:
+    with xlrd.open_workbook(filename) as f:
         sheet = f.sheets()[0] # for some reason get_sheet(0) fails
         rows = sheet.get_rows()
 
         # skip header
         next(rows)
         for row in tqdm.tqdm(rows, total=sheet.nrows):
-            state = row[0].value
-            city = row[12].value
-            zipcode = row[14].value
+            data = [row[nameToCol[name]].value for name in ('STATE', 'FDID', 'INC_NO', 'CITY', 'ZIP5')]
+            data = [(x if x != '' else None) for x in data]
 
-            if state == '':
-                state = None
-            if city == '':
-                city = None
-            if zipcode == '':
-                zipcode = None
-
-            # dates have a weird format '%m%d%Y' but month is not zero padded so strptime without some help
-            datestr = row[2].value
-            date = datetime.strptime('%08d' % (datestr,), '%m%d%Y')
-            date = datetime.strftime(date, '%Y-%m-%d')
-
-            records.append((city, state, zipcode, date))
+            records.append(data)
 
     print('Inserting records...')
-    batch_insert(conn, "INSERT INTO incident VALUES %s;", records, 10000, 100)
+    batch_insert(conn, "INSERT INTO incident_address VALUES %s;", records, 10000, 100)
 
 
 def load_measurements(conn, tarfilename, year=2008):
