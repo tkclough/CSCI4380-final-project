@@ -1,20 +1,15 @@
 import signal
 import sys
 import database
+import shlex
+import cmd
+import functools
 
-
-def help():
-    msg = """help: display this message
-exit: leave the program
-precipitationVsNumIncidents
-propertyDamageVsPrecipitation
-precipitationByCity <city>
-totalPrecipitationByState <state>
-totalIncidentsByCity <city>"""
-    print(msg)
+connection_string = "host='localhost' dbname='dbms_final_project' user='dbms_project_user' password='dbms_password'"
 
 
 def bye():
+    """Exit politely"""
     print('bye.')
     sys.exit(0)
 
@@ -23,82 +18,129 @@ def sigint_handler(sig, frame):
     bye()
 
 
-def precipitation_vs_num_incidents(db):
-    # TODO
-    pass
+def help_on_bad(f):
+    """Wrap a command that returns a bool. If f returns false, print an error message and the documentation for f."""
+    @functools.wraps(f)
+    def wrapper(self, *args, **kwargs):
+        res = f(self, *args, **kwargs)
+        if not res:
+            print("Input not understood.")
+            self.do_help(f.__name__.split("_")[1])
+
+    return wrapper
 
 
-def property_damage_vs_precipitation(db):
-    # TODO
-    pass
+class Shell(cmd.Cmd):
+    """Interprets user input."""
+    intro = "Enter 'help' for a list of commands."
+    prompt = "> "
+
+    def __init__(self, connection_string):
+        super().__init__()
+        self.db = database.DBMSFinalProject(connection_string)
+
+    @help_on_bad
+    def do_precipitationVsNumIncidents(self, arg):
+        args = parse(arg)
+        if len(args) > 0:
+            return False
+
+        res = self.db.precipitation_vs_num_incidents()
+        # TODO
+        print(res)
+
+        return True
+
+    @help_on_bad
+    def do_propertyDamageVsPrecipitation(self, arg):
+        """Get a table of property loss and precipitation: propertyDamageVsPrecipitation"""
+        args = parse(arg)
+        if len(args) > 0:
+            return False
+
+        res = self.db.property_damage_vs_precipitation()
+        # TODO
+        print(res)
+
+        return True
+
+    @help_on_bad
+    def do_precipitationByCity(self, arg):
+        """How much precipitation was there in a city: precipitationByCity 'Juneau, AK'"""
+        args = parse(arg)
+        if len(args) == 0:
+            return False
+
+        location = args[0]
+
+        # parse city, state
+        parts = location.split(',')
+        if len(parts) != 2:
+            return False
+
+        city, state = parts
+        city = city.strip()
+        state = state.strip()
+
+        precip = self.db.precipitation_by_city(city, state)
+        # TODO
+        print(precip)
+
+        return True
+
+    @help_on_bad
+    def do_totalPrecipitationByState(self, arg):
+        args = parse(arg)
+        if len(args) > 0:
+            return False
+
+        res = self.db.total_precipitation_by_state()
+        # TODO
+        print(res)
+
+        return True
+
+    @help_on_bad
+    def do_totalIncidentsByCity(self, arg):
+        """How many incidents have there been in a city: totalIncidentsByCity 'New York City, NY'"""
+        args = parse(arg)
+        if len(args) == 0:
+            return False
+
+        location = args[0]
+
+        parts = location.split(',')
+        if len(parts) != 2:
+            return False
+
+        city, state = parts
+        city = city.strip()
+        state = state.strip()
+
+        res = self.db.total_incidents_by_city(city, state)
+        # TODO
+        print(res)
+
+        return True
+
+    @help_on_bad
+    def do_exit(self, arg):
+        """Exit the program: exit"""
+        if len(parse(arg)) > 0:
+            return False
+
+        bye()
+
+    def do_EOF(self, arg):
+        return True
 
 
-def precipitation_by_city(db, city):
-    # TODO
-    pass
-
-
-def total_precipitation_by_state(db, state):
-    # TODO
-    pass
-
-
-def total_incidents_by_city(db, city):
-    # TODO
-    pass
-
-
-def main():
-    connection_string = "host='localhost' dbname='dbms_final_project' user='dbms_project_user' password='dbms_password'"
-    db = database.DBMSFinalProject(connection_string)
-    print("Enter 'help' for a list of commands.")
-    while True:
-        user_input = input('> ')
-        parts = user_input.split()
-
-        if len(parts) == 0:
-            print("Ill-formatted input. Enter 'help' for a list of commands.")
-
-        command = parts[0]
-
-        # command dispatch
-        if command == 'help':
-            help()
-        elif command == 'exit':
-            bye()
-        elif command == 'precipitationVsNumIncidents':
-            if len(parts) != 1:
-                print("Usage: precipitationVsNumIncidents")
-            else:
-                precipitation_vs_num_incidents(db)
-        elif command == 'propertyDamageVsPrecipitation':
-            if len(parts) != 1:
-                print("Usage: propertyDamageVsPrecipitation")
-            else:
-                property_damage_vs_precipitation(db)
-        elif command == 'precipitationByCity':
-            if len(parts) != 2:
-                print("Usage: precipitationByCity <city>")
-            else:
-                city = parts[1]
-                precipitation_by_city(db, city)
-        elif command == 'totalPrecipitationByState':
-            if len(parts) != 2:
-                print("Usage: totalPrecipitationByState <state>")
-            else:
-                state = parts[1]
-                total_precipitation_by_state(db, state)
-        elif command == 'totalIncidentsByCity':
-            if len(parts) != 2:
-                print("Usage: totalIncidentsByCity <city>")
-            else:
-                city = parts[1]
-                total_incidents_by_city(db, city)
-        else:
-            print("Unrecognized command. Enter 'help' for a list of commands.")
+def parse(arg):
+    """Parse command input into a list of elements. Quoted values are handled as whole parts of the command."""
+    return shlex.split(arg)
 
 
 if __name__ == '__main__':
     # register sigint handler
     signal.signal(signal.SIGINT, sigint_handler)
-    main()
+    Shell(connection_string).cmdloop()

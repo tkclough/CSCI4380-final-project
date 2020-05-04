@@ -19,17 +19,17 @@ def main():
     print("Loading data")
 
     with psycopg2.connect(connection_string) as conn:
-        # # write to a new csv that only includes rows from 2008
-        # print('Loading measurement data')
-        # load_measurements(conn, 'datasets/HPD_v02r02_POR_s19400101_e20200422_c20200429.tar.gz')
-        #
-        # # read incident data
-        # print('Loading 2008 fire incident data')
-        # load_incident_address(conn, 'datasets/2008incidentaddress.xlsx')
-        #
-        # # compute closest stations
-        # print('Computing closest stations')
-        # compute_closest_stations(conn)
+        # write to a new csv that only includes rows from 2008
+        print('Loading measurement data')
+        load_measurements(conn, 'datasets/HPD_v02r02_POR_s19400101_e20200422_c20200429.tar.gz')
+
+        # read incident data
+        print('Loading 2008 fire incident data')
+        load_incident_address(conn, 'datasets/2008incidentaddress.xlsx')
+
+        # compute closest stations
+        print('Computing closest stations')
+        compute_closest_stations(conn)
 
         print('Loading basic incident data')
         load_basic_incident(conn, 'datasets/basicincident.xlsx')
