@@ -45,13 +45,19 @@ class Shell(cmd.Cmd):
 
     @help_on_bad
     def do_precipitationVsNumIncidents(self, arg):
-        """Get a table of and precipitation and incidents: precipitationVsNumIncidents"""
+        """\n----------------------------------------------\nGet a table of and precipitation and incidents\n\nUSAGE: precipitationVsNumIncidents\nTo display all results, run with flag --all\n----------------------------------------------\n"""
+        print_all = False
+
         args = parse(arg)
         if len(args) > 0:
-            return False
+            flag = args[0].strip()
+            if flag == '--all':
+                print_all = True
+            else:
+                return False
 
         res = self.db.precipitation_vs_num_incidents()
-        # print("Zipcode\t", "Number of Incidents\t", "Precipitation (Inches)")
+
         zipcodes = []
         incidents = []
         precips = []
@@ -63,11 +69,23 @@ class Shell(cmd.Cmd):
 
         data = {'Zipcode':zipcodes, 'Number of Incidents':incidents, 'Precipitation (Inches)':precips}
         df = pd.DataFrame(data)
-        print(df)
 
-        plt.plot(precips, incidents)
+        blank_index = [''] * len(df)
+        df.index = blank_index
+
+        if(print_all):
+            pd.set_option('display.max_rows',None)
+        else:
+            pd.set_option('display.max_rows',200)
+
+        # print(df)
+
+        print('\n',df,'\n')
+
+        plt.scatter(precips, incidents, s=10)
         plt.xlabel('Precipitation (Inches)')
         plt.ylabel('Number of Incidents')
+        plt.suptitle('Precipitation VS Number of Incidents')
         # plt.show()
 
         plt.savefig('precipitation_vs_num_incidents.png')
@@ -77,10 +95,16 @@ class Shell(cmd.Cmd):
 
     @help_on_bad
     def do_propertyDamageVsPrecipitation(self, arg):
-        """Get a table of property loss and precipitation: propertyDamageVsPrecipitation"""
+        """\n----------------------------------------------\nGet a table of property loss and precipitation\n\nUSAGE: propertyDamageVsPrecipitation\nTo display all results, run with flag --all\n----------------------------------------------\n"""
+        print_all = False
+
         args = parse(arg)
         if len(args) > 0:
-            return False
+            flag = args[0].strip()
+            if flag == '--all':
+                print_all = True
+            else:
+                return False
 
         res = self.db.property_damage_vs_precipitation()
         
@@ -93,11 +117,21 @@ class Shell(cmd.Cmd):
 
         data = {'Property Loss':damage, 'Precipitation (Inches)':precips}
         df = pd.DataFrame(data)
-        print(df)
 
-        plt.plot(precips, damage)
+        blank_index = [''] * len(df)
+        df.index = blank_index
+
+        if(print_all):
+            pd.set_option('display.max_rows',None)
+        else:
+            pd.set_option('display.max_rows',200)
+
+        print('\n',df,'\n')
+
+        plt.scatter(precips, damage, s=10)
         plt.xlabel('Precipitation (Inches)')
         plt.ylabel('Property Loss')
+        plt.suptitle('Property Damage VS Precipitation')
         # plt.show()
 
         plt.savefig('property_damage_vs_precipitation.png')
@@ -106,7 +140,7 @@ class Shell(cmd.Cmd):
 
     @help_on_bad
     def do_precipitationByCity(self, arg):
-        """How much precipitation was there in a city: precipitationByCity 'Juneau, AK'"""
+        """\n------------------------------------------\nHow much precipitation was there in a city\n\nUSAGE: precipitationByCity 'Juneau, AK\n------------------------------------------\n'"""
         args = parse(arg)
         if len(args) == 0:
             return False
@@ -124,13 +158,13 @@ class Shell(cmd.Cmd):
 
         precip = self.db.precipitation_by_city(city, state)
 
-        print(precip[0], "inches")
+        print('\n',precip[0], "inches\n")
 
         return True
 
     @help_on_bad
     def do_totalPrecipitationByState(self, arg):
-        """Get a table of how much precipitation there was in each state: totalPrecipitationByState"""
+        """\n-------------------------------------------------------------\nGet a table of how much precipitation there was in each state\n\nUSAGE: totalPrecipitationByState\n-------------------------------------------------------------\n"""
         args = parse(arg)
         if len(args) > 0:
             return False
@@ -146,13 +180,19 @@ class Shell(cmd.Cmd):
 
         data = {'State':state, 'Precipitation (Inches)':precips}
         df = pd.DataFrame(data)
-        print(df)
+
+        blank_index = [''] * len(df)
+        df.index = blank_index
+        # print(tabulate(df, headers='keys', tablefmt='psql', showindex=False))
+        # print(df)
+
+        print('\n',df,'\n')
 
         return True
 
     @help_on_bad
     def do_totalIncidentsByCity(self, arg):
-        """How many incidents have there been in a city: totalIncidentsByCity 'New York City, NY'"""
+        """\n--------------------------------------------\nHow many incidents have there been in a city\n\nUSAGE: totalIncidentsByCity 'New York City, NY\n--------------------------------------------\n'"""
         args = parse(arg)
         if len(args) == 0:
             return False
@@ -169,13 +209,13 @@ class Shell(cmd.Cmd):
 
         res = self.db.total_incidents_by_city(city, state)
         # TODO
-        print(res[0][0], "incidents")
+        print('\n',res[0][0], "incidents\n")
 
         return True
 
     @help_on_bad
     def do_exit(self, arg):
-        """Exit the program: exit"""
+        """\n----------------\nExit the program\n\nUSAGE: exit\n----------------\n"""
         if len(parse(arg)) > 0:
             return False
 
