@@ -4,6 +4,10 @@ import database
 import shlex
 import cmd
 import functools
+import pandas as pd
+pd.set_option('display.max_rows',200)
+pd.set_option('display.min_rows', 100)
+import matplotlib.pyplot as plt
 
 connection_string = "host='localhost' dbname='dbms_final_project' user='dbms_project_user' password='dbms_password'"
 
@@ -41,13 +45,33 @@ class Shell(cmd.Cmd):
 
     @help_on_bad
     def do_precipitationVsNumIncidents(self, arg):
+        """Get a table of and precipitation and incidents: precipitationVsNumIncidents"""
         args = parse(arg)
         if len(args) > 0:
             return False
 
         res = self.db.precipitation_vs_num_incidents()
-        # TODO
-        print(res)
+        # print("Zipcode\t", "Number of Incidents\t", "Precipitation (Inches)")
+        zipcodes = []
+        incidents = []
+        precips = []
+
+        for line in res:
+            zipcodes.append(line[0])
+            incidents.append(line[1])
+            precips.append(line[2])
+
+        data = {'Zipcode':zipcodes, 'Number of Incidents':incidents, 'Precipitation (Inches)':precips}
+        df = pd.DataFrame(data)
+        print(df)
+
+        plt.plot(precips, incidents)
+        plt.xlabel('Precipitation (Inches)')
+        plt.ylabel('Number of Incidents')
+        # plt.show()
+
+        plt.savefig('precipitation_vs_num_incidents.png')
+
 
         return True
 
@@ -59,8 +83,24 @@ class Shell(cmd.Cmd):
             return False
 
         res = self.db.property_damage_vs_precipitation()
-        # TODO
-        print(res)
+        
+        damage = []
+        precips = []
+
+        for line in res:
+            damage.append(line[0])
+            precips.append(line[1])
+
+        data = {'Property Loss':damage, 'Precipitation (Inches)':precips}
+        df = pd.DataFrame(data)
+        print(df)
+
+        plt.plot(precips, damage)
+        plt.xlabel('Precipitation (Inches)')
+        plt.ylabel('Property Loss')
+        # plt.show()
+
+        plt.savefig('property_damage_vs_precipitation.png')
 
         return True
 
@@ -83,20 +123,30 @@ class Shell(cmd.Cmd):
         state = state.strip()
 
         precip = self.db.precipitation_by_city(city, state)
-        # TODO
-        print(precip)
+
+        print(precip[0], "inches")
 
         return True
 
     @help_on_bad
     def do_totalPrecipitationByState(self, arg):
+        """Get a table of how much precipitation there was in each state: totalPrecipitationByState"""
         args = parse(arg)
         if len(args) > 0:
             return False
 
         res = self.db.total_precipitation_by_state()
-        # TODO
-        print(res)
+
+        state = []
+        precips = []
+
+        for line in res:
+            state.append(line[0])
+            precips.append(line[1])
+
+        data = {'State':state, 'Precipitation (Inches)':precips}
+        df = pd.DataFrame(data)
+        print(df)
 
         return True
 
@@ -119,7 +169,7 @@ class Shell(cmd.Cmd):
 
         res = self.db.total_incidents_by_city(city, state)
         # TODO
-        print(res)
+        print(res[0][0], "incidents")
 
         return True
 
