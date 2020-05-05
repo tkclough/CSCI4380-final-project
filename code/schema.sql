@@ -1,9 +1,6 @@
-CREATE TABLE test(
-    a VARCHAR(15),
-    b INT
-);
 
 DROP TABLE IF EXISTS measurement;
+DROP TABLE IF EXISTS measurement_skipped_rows;
 DROP TABLE IF EXISTS incident_address;
 DROP TABLE IF EXISTS closest_station;
 DROP TABLE IF EXISTS basic_incident;
@@ -87,5 +84,11 @@ CREATE TABLE closest_station (
     zipcode CHAR(5),
     stnId CHAR(12)
 );
+
+CREATE INDEX basic_incident_incno ON basic_incident (inc_no);
+CREATE INDEX incident_address_incno ON incident_address (inc_no);
+CREATE INDEX incident_address_zip_idx ON incident_address (ZIP5);
+CREATE INDEX closest_station_zip_idx ON closest_station (zipcode);
+CREATE INDEX closest_station_stn_idx ON closest_station (stnid);
 
 GRANT ALL PRIVILEGES ON TABLE measurement, measurement_skipped_rows, incident_address, closest_station, basic_incident TO dbms_project_user;

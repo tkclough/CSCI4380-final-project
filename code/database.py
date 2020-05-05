@@ -7,20 +7,18 @@ class DBMSFinalProject:
 
     def precipitation_vs_num_incidents(self):
         query = """
-        SELECT t1.zipcode as zip, incids, SUM(precip) as precip
+        SELECT t1.zipcode as zip, incids, precip
         FROM
             (SELECT zip5 as zipcode, COUNT(*) as incids
             FROM incident_address
             GROUP BY zipcode) as t1
         JOIN
-            closest_station
-            ON t1.zipcode=closest_station.zipcode
-        JOIN
-            (SELECT stnId, SUM(value) as precip
-            FROM measurement
-            GROUP BY stnId) as t2
-            ON t2.stnId=closest_station.stnId
-        GROUP BY t2.stnId;
+            (SELECT zipcode, SUM(value) as precip
+            FROM (SELECT * FROM measurement WHERE NOT value=-9999 AND NOT value=0) as t2
+            JOIN closest_station
+                ON t2.stnId=closest_station.stnId
+            GROUP BY zipcode) as t3
+            ON t3.zipcode=t1.zipcode;
         """
 
         with self.conn.cursor() as cur:
@@ -30,10 +28,10 @@ class DBMSFinalProject:
 
     def property_damage_vs_precipitation(self):
         query = """
-        SELECT prop_loss, precip
+        SELECT prop_loss, precip, COUNT(*)
         FROM
-            (SELECT prop_loss, ZIP5 as zipcode, incident_address.date as date
-            FROM inicident
+            (SELECT prop_loss, ZIP5 as zipcode, basic_incident.inc_date as date
+            FROM incident_address
             JOIN basic_incident
                 ON incident_address.inc_no=basic_incident.inc_no
             ) as t1
@@ -41,21 +39,16 @@ class DBMSFinalProject:
             closest_station
             ON t1.zipcode=closest_station.zipcode
         JOIN
-            (SELECT stnId, value as precip
-            FROM measurement
-            GROUP BY stnId) as t2
+            (SELECT stnId, value as precip, datetime as date
+            FROM measurement) as t2
             ON
                 t2.stnId = closest_station.stnId
-                AND
-                DATE_PART('day', t2.date - t1.date) * 24 + DATE_PART('hour', t2.date - t1.date)
-                =
-                (SELECT MIN(DATE_PART('day', m.date - i.date) * 24 + DATE_PART('hour', m.date - i.date))
-                FROM measurement as m
-                JOIN closest_station as c
-                    ON m.stnId=c.stnId
-                JOIN incident_address as i
-                    ON i.zipcode=c.zipcode)
-        ORDER BY prop_loss DESC;
+                AND t2.date >= t1.date
+                AND t2.date < t1.date + interval '1 hour'
+        WHERE prop_loss IS NOT NULL
+            AND NOT precip=-9999
+		GROUP BY prop_loss, precip
+		ORDER BY prop_loss DESC;
         """
 
         with self.conn.cursor() as cur:
@@ -85,8 +78,8 @@ class DBMSFinalProject:
         FROM incident_address
         JOIN closest_station
             ON incident_address.ZIP5=closest_station.zipcode
-        JOIN measurement
-            ON incident_address.stnId = closest_station.stnId
+        JOIN (SELECT * FROM measurement WHERE NOT value=-9999 AND NOT value=0) as m
+            ON m.stnId = closest_station.stnId
         GROUP BY state
         ORDER BY state;
         """
