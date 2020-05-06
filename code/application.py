@@ -45,8 +45,36 @@ class Shell(cmd.Cmd):
         self.db = database.DBMSFinalProject(connection_string)
 
     @help_on_bad
+    def do_incidentStates(self, arg):
+        """
+-------------------------------------------
+Get the states that have fire incident data
+
+USAGE: incidentStates
+-------------------------------------------
+"""
+        args = parse(arg)
+        if len(args) > 0:
+            return False
+
+        res = self.db.incident_states()
+
+        df = pd.DataFrame({'States': [r[0] for r in res]})
+
+        print(df)
+
+        return True
+
+    @help_on_bad
     def do_precipitationVsNumIncidents(self, arg):
-        """\n----------------------------------------------\nGet a table of and precipitation and incidents\n\nUSAGE: precipitationVsNumIncidents\nTo display all results, run with flag --all\n----------------------------------------------\n"""
+        """
+----------------------------------------------
+Get a table of precipitation and incidents
+
+USAGE: precipitationVsNumIncidents
+To display all results, run with flag --all
+----------------------------------------------
+"""
         print_all = False
 
         args = parse(arg)
@@ -92,7 +120,14 @@ class Shell(cmd.Cmd):
 
     @help_on_bad
     def do_propertyDamageVsPrecipitation(self, arg):
-        """\n----------------------------------------------\nGet a table of property loss and precipitation\n\nUSAGE: propertyDamageVsPrecipitation\nTo display all results, run with flag --all\n----------------------------------------------\n"""
+        """
+----------------------------------------------
+Get a table of property loss and precipitation
+
+USAGE: propertyDamageVsPrecipitation
+To display all results, run with flag --all
+----------------------------------------------
+"""
         print_all = False
 
         args = parse(arg)
@@ -136,7 +171,13 @@ class Shell(cmd.Cmd):
 
     @help_on_bad
     def do_precipitationByCity(self, arg):
-        """\n------------------------------------------\nHow much precipitation was there in a city\n\nUSAGE: precipitationByCity 'Juneau, AK\n------------------------------------------\n'"""
+        """
+------------------------------------------
+How much precipitation was there in a city
+
+USAGE: precipitationByCity 'Juneau, AK'
+------------------------------------------
+"""
         args = parse(arg)
         if len(args) == 0:
             return False
@@ -160,7 +201,13 @@ class Shell(cmd.Cmd):
 
     @help_on_bad
     def do_totalPrecipitationByState(self, arg):
-        """\n-------------------------------------------------------------\nGet a table of how much precipitation there was in each state\n\nUSAGE: totalPrecipitationByState\n-------------------------------------------------------------\n"""
+        """
+-------------------------------------------------------------
+Get a table of how much precipitation there was in each state
+
+USAGE: totalPrecipitationByState
+-------------------------------------------------------------
+"""
         args = parse(arg)
         if len(args) > 0:
             return False
@@ -186,7 +233,13 @@ class Shell(cmd.Cmd):
 
     @help_on_bad
     def do_totalIncidentsByCity(self, arg):
-        """\n--------------------------------------------\nHow many incidents have there been in a city\n\nUSAGE: totalIncidentsByCity 'New York City, NY\n--------------------------------------------\n'"""
+        """
+--------------------------------------------
+How many incidents have there been in a city
+
+USAGE: totalIncidentsByCity 'Girdwood, CA'
+--------------------------------------------
+"""
         args = parse(arg)
         if len(args) == 0:
             return False
@@ -208,7 +261,13 @@ class Shell(cmd.Cmd):
 
     @help_on_bad
     def do_exit(self, arg):
-        """\n----------------\nExit the program\n\nUSAGE: exit\n----------------\n"""
+        """
+----------------
+Exit the program
+
+USAGE: exit
+----------------
+"""
         if len(parse(arg)) > 0:
             return False
 

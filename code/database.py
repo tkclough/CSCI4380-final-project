@@ -5,6 +5,18 @@ class DBMSFinalProject:
     def __init__(self, connection_string):
         self.conn = psycopg2.connect(connection_string)
 
+    def incident_states(self):
+        query = """
+        SELECT DISTINCT state
+        FROM incident_address
+        ORDER BY state;
+        """
+
+        with self.conn.cursor() as cur:
+            cur.execute(query)
+            res = cur.fetchall()
+            return res
+
     def precipitation_vs_num_incidents(self):
         query = """
         SELECT t1.zipcode as zip, incids, precip
