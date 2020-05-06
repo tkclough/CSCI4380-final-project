@@ -16,9 +16,15 @@ connection_string = "host='localhost' dbname='dbms_final_project' user='dbms_pro
 
 def main():
     start_time = time.time()
-    print("Loading data")
 
     with psycopg2.connect(connection_string) as conn:
+        print("Writing schema")
+        with open("schema.sql", "r") as f, conn.cursor() as cur:
+            cur.execute(f.read())
+        conn.commit()
+
+        print("Loading data")
+
         # write to a new csv that only includes rows from 2008
         print('Loading measurement data')
         load_measurements(conn, 'datasets/HPD_v02r02_POR_s19400101_e20200422_c20200429.tar.gz')
@@ -38,6 +44,7 @@ def main():
 
 
 def batch_insert(conn, stmt, records, batch_size, page_size):
+    """Insert a large number of values into a table in batches, with progress bar included."""
     with conn.cursor() as cur:
         record_iter = iter(records)
         for i in tqdm.tqdm(range(0, len(records), batch_size)):
@@ -48,6 +55,9 @@ def batch_insert(conn, stmt, records, batch_size, page_size):
 
 
 def load_basic_incident(conn, filename, batch_size=10000):
+    """The basic incident file contains information about the events, not including the address info. For whatever
+    reason, someone in the government thought xlsx files would be good for storing a lot of information, so it takes a
+    while."""
     header = [
         'STATE', 'FDID', 'INC_DATE', 'INC_NO', 'EXP_NO', 'VERSION', 'DEPT_STA', 'INC_TYPE', 'ADD_WILD', 'AID', 'ALARM',
         'ARRIVAL', 'INC_CONT', 'LU_CLEAR', 'SHIFT', 'ALARMS', 'DISTRICT', 'ACT_TAK1', 'ACT_TAK2', 'ACT_TAK3', 'APP_MOD',
@@ -60,6 +70,7 @@ def load_basic_incident(conn, filename, batch_size=10000):
 
     print('Opening excel workbook, give me a minute...')
     # for some reason doesn't define __enter__ so can't use context manager
+    # using openpyxl here because it allows for constant memory access, even to large files like this one
     wb = openpyxl.load_workbook(filename=filename, read_only=True)
     try:
         with conn.cursor() as cur:
@@ -88,6 +99,8 @@ def load_basic_incident(conn, filename, batch_size=10000):
 
 
 def load_incident_address(conn, filename):
+    """The incident address file stores location information about events, which can be referenced from the basic
+    incident table."""
     header = [
         'STATE', 'FDID', 'INC_DATE', 'INC_NO', 'EXP_NO', 'LOC_TYPE', 'NUM_MILE', 'STREET_PRE', 'STREETNAME',
         'STREETTYPE', 'STREETSUF', 'APT_NO', 'CITY', 'STATE_ID', 'ZIP5', 'ZIP4', 'X_STREET'
@@ -96,6 +109,8 @@ def load_incident_address(conn, filename):
 
     print('Opening excel workbook, give me a minute...')
     records = []
+
+    # xlrd is faster than openpyxl when the data fits in memory, like this file
     with xlrd.open_workbook(filename) as f:
         sheet = f.sheets()[0] # for some reason get_sheet(0) fails
         rows = sheet.get_rows()
@@ -113,6 +128,7 @@ def load_incident_address(conn, filename):
 
 
 def load_measurements(conn, tarfilename, year=2008):
+    """This loads precipitation data from a tar archive. It takes a while."""
     pat = r'(\d{4})-(\d{2})-(\d{2})'
 
     headers = [
@@ -172,6 +188,7 @@ def load_measurements(conn, tarfilename, year=2008):
 
 
 def compute_closest_stations(conn):
+    """In order to join the precipitation data and the fire data, we compute the closest stations to each zipcode."""
     records = []
 
     stations = list()

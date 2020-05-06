@@ -209,7 +209,6 @@ class Shell(cmd.Cmd):
         state = state.strip()
 
         res = self.db.total_incidents_by_city(city, state)
-        # TODO
         print('\n',res[0][0], "incidents\n")
 
         return True
