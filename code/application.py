@@ -5,9 +5,10 @@ import shlex
 import cmd
 import functools
 import pandas as pd
+import matplotlib.pyplot as plt
+
 pd.set_option('display.max_rows',200)
 pd.set_option('display.min_rows', 100)
-import matplotlib.pyplot as plt
 
 connection_string = "host='localhost' dbname='dbms_final_project' user='dbms_project_user' password='dbms_password'"
 
