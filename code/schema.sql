@@ -5,45 +5,45 @@ DROP TABLE IF EXISTS incident_address;
 DROP TABLE IF EXISTS closest_station;
 DROP TABLE IF EXISTS basic_incident;
 
-CREATE TABLE measurement (
+CREATE TABLE IF NOT EXISTS measurement (
     stnId CHAR(12),
     datetime TIMESTAMP,
     value INTEGER,
     PRIMARY KEY (stnId, datetime)
 );
 
-CREATE TABLE measurement_skipped_rows (
+CREATE TABLE IF NOT EXISTS measurement_skipped_rows (
     lineno INTEGER,
-    filename VARCHAR(128)
+    filename VARCHAR(127)
 );
 
-CREATE TABLE incident_address (
+CREATE TABLE IF NOT EXISTS incident_address (
     STATE CHAR(2),
     FDID CHAR(5),
 --    INC_DATE INTEGER,
-    INC_NO VARCHAR(16),
+    INC_NO VARCHAR(15),
 --    EXP_NO INTEGER,
 --    LOC_TYPE SMALLINT,
 --    NUM_MILE INTEGER,
---    STREET_PRE VARCHAR(64),
---    STREETNAME VARCHAR(128),
+--    STREET_PRE VARCHAR(63),
+--    STREETNAME VARCHAR(127),
 --    STREETSUF VARCHAR(8),
 --    APT_NO INTEGER,
-    CITY VARCHAR(128),
+    CITY VARCHAR(127),
 --    STATE_ID INTEGER,
     ZIP5 CHAR(5)
 --    ZIP4 CHAR(4),
---    X_STREET VARCHAR(128)
+--    X_STREET VARCHAR(127)
 );
 
-CREATE TABLE basic_incident (
+CREATE TABLE IF NOT EXISTS basic_incident (
 --    STATE CHAR(2),
 --    FDID CHAR(5),
     INC_DATE Date,
-    INC_NO VARCHAR(16),
+    INC_NO VARCHAR(15),
 --    EXP_NO INTEGER,
 --    VERSION NUMERIC(5, 3),
---    DEPT_STA VARCHAR(16),
+--    DEPT_STA VARCHAR(15),
 --    INC_TYPE INTEGER,
 --    ADD_WILD CHAR(1),
 --    AID CHAR(1),
@@ -52,7 +52,7 @@ CREATE TABLE basic_incident (
 --    INC_CONT BIGINT,
 --    LU_CLEAR BIGINT,
 --    SHIFT CHAR(1),
---    ALARMS VARCHAR(16),
+--    ALARMS VARCHAR(15),
 --    DISTRICT VARCHAR(32),
 --    ACT_TAK1 CHAR(3),
 --    ACT_TAK2 CHAR(3),
@@ -80,7 +80,7 @@ CREATE TABLE basic_incident (
 --    CENSUS VARCHAR(8)
 );
 
-CREATE TABLE closest_station (
+CREATE TABLE IF NOT EXISTS closest_station (
     zipcode CHAR(5),
     stnId CHAR(12)
 );

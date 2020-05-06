@@ -79,18 +79,14 @@ class Shell(cmd.Cmd):
         else:
             pd.set_option('display.max_rows',200)
 
-        # print(df)
-
         print('\n',df,'\n')
 
         plt.scatter(precips, incidents, s=10)
         plt.xlabel('Precipitation (Inches)')
         plt.ylabel('Number of Incidents')
         plt.suptitle('Precipitation VS Number of Incidents')
-        # plt.show()
 
         plt.savefig('precipitation_vs_num_incidents.png')
-
 
         return True
 
@@ -127,13 +123,12 @@ class Shell(cmd.Cmd):
         else:
             pd.set_option('display.max_rows',200)
 
-        print('\n',df,'\n')
+        print('\n', df, '\n')
 
         plt.scatter(precips, damage, s=10)
         plt.xlabel('Precipitation (Inches)')
         plt.ylabel('Property Loss')
         plt.suptitle('Property Damage VS Precipitation')
-        # plt.show()
 
         plt.savefig('property_damage_vs_precipitation.png')
 
@@ -159,7 +154,7 @@ class Shell(cmd.Cmd):
 
         precip = self.db.precipitation_by_city(city, state)
 
-        print('\n',precip[0], "inches\n")
+        print('\n', precip[0], "inches\n")
 
         return True
 
@@ -184,10 +179,8 @@ class Shell(cmd.Cmd):
 
         blank_index = [''] * len(df)
         df.index = blank_index
-        # print(tabulate(df, headers='keys', tablefmt='psql', showindex=False))
-        # print(df)
 
-        print('\n',df,'\n')
+        print('\n', df,' \n')
 
         return True
 
